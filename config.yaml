@@ -1,0 +1,32 @@
+# 小红书AI写作分析系统配置文件
+
+# Anthropic Claude API
+anthropic:
+  api_key: "${ANTHROPIC_API_KEY}"  # 优先读环境变量
+  model: "claude-sonnet-4-6"       # 默认模型
+  max_tokens: 4096
+  temperature: 0.7
+  timeout: 120                      # 请求超时(秒)
+
+# 数据库
+database:
+  path: "data/xhs_ai.db"
+
+# Skill 导出
+skills:
+  export_dir: "data/skills"
+
+# 分析
+analysis:
+  model: "claude-sonnet-4-6"
+  max_tokens: 4096
+  max_retries: 3
+  retry_delay: 2
+
+# 生成
+generation:
+  model: "claude-sonnet-4-6"
+  max_tokens: 4096
+  temperature: 0.8
+  max_retries: 3
+  retry_delay: 2
