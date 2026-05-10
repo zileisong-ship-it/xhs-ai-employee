@@ -1,0 +1,22 @@
+{
+  "name": "小红书AI写作助手",
+  "short_name": "AI写作",
+  "description": "小红书AI写作分析系统",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FE2C55",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/public/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/public/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

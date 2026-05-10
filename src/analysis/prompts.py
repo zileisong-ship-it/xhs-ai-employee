@@ -54,3 +54,18 @@ def build_analysis_user_prompt(notes: list) -> str:
 {notes_text}
 
 请严格按照要求的 JSON 格式输出分析结果。"""
+
+
+def build_multimodal_analysis_message(text_prompt: str, images: list[dict]) -> list[dict]:
+    """构建带图片的多模态分析消息。images 为 [{'data': 'base64...', 'media_type': 'image/...'}]"""
+    content = [{"type": "text", "text": text_prompt}]
+    for img in images:
+        content.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": img["media_type"],
+                "data": img["data"],
+            },
+        })
+    return content

@@ -5,6 +5,7 @@ from datetime import datetime
 from src.database import get_session
 from src.models import Blogger, Note
 from src.ingestion.parser import parse_note_text, parse_batch_file, clean_content
+from src.ingestion.media import save_media_files
 
 
 def import_single_note(
@@ -13,16 +14,21 @@ def import_single_note(
     source_url: str = "",
     metrics: dict | None = None,
     published_at: str | None = None,
+    media_files: list[tuple[bytes, str]] | None = None,
 ) -> Note:
-    """导入单篇笔记"""
+    """导入单篇笔记，支持附带图片/视频附件。"""
     session = get_session()
     parsed = parse_note_text(raw_text)
+
+    attachments = save_media_files(media_files) if media_files else []
+
     note = Note(
         blogger_id=blogger_id,
         title=parsed["title"],
         content=clean_content(parsed["content"]),
         source_url=source_url,
         metrics_json=json.dumps(metrics or {}, ensure_ascii=False),
+        attachments_json=json.dumps(attachments, ensure_ascii=False),
         published_at=datetime.fromisoformat(published_at) if published_at else None,
     )
     session.add(note)

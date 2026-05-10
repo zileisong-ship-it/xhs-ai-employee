@@ -18,12 +18,24 @@ def load_config() -> dict:
 
 def get_client() -> Anthropic:
     config = load_config()
-    api_key = config["anthropic"]["api_key"]
-    if api_key.startswith("${") and api_key.endswith("}"):
-        env_var = api_key[2:-1]
-        api_key = os.environ.get(env_var, "")
+
+    # 1. Streamlit Cloud secrets 优先
+    api_key = ""
+    try:
+        import streamlit as st
+        api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    except Exception:
+        pass
+
+    # 2. 本地：config.yaml 环境变量引用
     if not api_key:
-        raise ValueError("请设置 ANTHROPIC_API_KEY 环境变量")
+        api_key = config["anthropic"]["api_key"]
+        if api_key.startswith("${") and api_key.endswith("}"):
+            env_var = api_key[2:-1]
+            api_key = os.environ.get(env_var, "")
+
+    if not api_key:
+        raise ValueError("请设置 ANTHROPIC_API_KEY（本地用 .env，云端用 Streamlit Secrets）")
     timeout = config["anthropic"].get("timeout", 120)
     return Anthropic(api_key=api_key, timeout=timeout)
 

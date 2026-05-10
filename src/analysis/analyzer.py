@@ -1,14 +1,19 @@
-"""Claude API 分析引擎"""
+"""Claude API 分析引擎 — 支持文本+图片多模态分析"""
 
 import json
 from src.config import load_config, get_client, call_and_parse_json
-from src.analysis.prompts import ANALYSIS_SYSTEM_PROMPT, build_analysis_user_prompt
+from src.analysis.prompts import (
+    ANALYSIS_SYSTEM_PROMPT,
+    build_analysis_user_prompt,
+    build_multimodal_analysis_message,
+)
 from src.database import get_session
 from src.models import Note, Skill, Blogger
+from src.ingestion.media import load_attachments_as_images
 
 
 def analyze_blogger_notes(blogger_id: str) -> Skill:
-    """分析博主的所有笔记，生成写作模式 Skill"""
+    """分析博主的所有笔记（含图片/视频帧），生成写作模式 Skill"""
     config = load_config()
     session = get_session()
     try:
@@ -23,14 +28,36 @@ def analyze_blogger_notes(blogger_id: str) -> Skill:
         client = get_client()
         user_prompt = build_analysis_user_prompt(notes)
 
-        patterns = call_and_parse_json(
-            client,
-            "analysis",
-            model=config["analysis"]["model"],
-            max_tokens=config["analysis"]["max_tokens"],
-            system=ANALYSIS_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
-        )
+        # 收集笔记中的图片附件（限制总数避免请求过大）
+        all_images = []
+        for note in notes[:10]:
+            imgs = load_attachments_as_images(note.attachments_json)
+            all_images.extend(imgs)
+            if len(all_images) >= 20:
+                break
+
+        if all_images:
+            # 多模态分析
+            messages_content = build_multimodal_analysis_message(
+                user_prompt, all_images
+            )
+            patterns = call_and_parse_json(
+                client,
+                "analysis",
+                model=config["analysis"]["model"],
+                max_tokens=config["analysis"]["max_tokens"],
+                system=ANALYSIS_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": messages_content}],
+            )
+        else:
+            patterns = call_and_parse_json(
+                client,
+                "analysis",
+                model=config["analysis"]["model"],
+                max_tokens=config["analysis"]["max_tokens"],
+                system=ANALYSIS_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
 
         patterns["meta"] = {
             "analyzed_notes_count": len(notes),

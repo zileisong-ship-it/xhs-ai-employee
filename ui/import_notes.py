@@ -1,5 +1,6 @@
 """笔记导入页面"""
 
+import json
 import streamlit as st
 from src.database import get_session
 from src.models import Blogger
@@ -36,10 +37,21 @@ def show():
             placeholder="在这里粘贴小红书笔记的完整内容...",
         )
         source_url = st.text_input("原文链接（可选）")
+        st.caption("附带图片/视频（可选，AI 分析时会参考视觉内容）")
+        media_uploads = st.file_uploader(
+            "上传图片或视频",
+            type=["png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "avi", "mkv", "webm"],
+            accept_multiple_files=True,
+            key="note_media",
+        )
         if st.button("导入笔记", type="primary"):
             if raw_text.strip():
-                note = import_single_note(blogger_id, raw_text, source_url)
-                st.success(f"导入成功！笔记「{note.title}」已保存")
+                media_tuples = [(uf.read(), uf.name) for uf in media_uploads] if media_uploads else None
+                note = import_single_note(blogger_id, raw_text, source_url, media_files=media_tuples)
+                if media_uploads:
+                    st.success(f"导入成功！笔记「{note.title}」+ {len(media_uploads)} 个附件已保存")
+                else:
+                    st.success(f"导入成功！笔记「{note.title}」已保存")
             else:
                 st.error("请粘贴笔记内容")
 
@@ -61,7 +73,19 @@ def show():
             st.info("该博主还没有导入笔记")
         else:
             for note in notes:
-                with st.expander(f"{note.title or '(无标题)'} — {note.imported_at.strftime('%Y-%m-%d %H:%M')}"):
+                attach_info = ""
+                try:
+                    atts = json.loads(note.attachments_json) if note.attachments_json else []
+                    if atts:
+                        types = set(a.get("type", "file") for a in atts)
+                        parts = []
+                        if "image" in types: parts.append("📷图片")
+                        if "video" in types: parts.append("🎬视频")
+                        attach_info = " + " + " ".join(parts)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+                with st.expander(f"{note.title or '(无标题)'}{attach_info} — {note.imported_at.strftime('%Y-%m-%d %H:%M')}"):
                     st.text(note.content[:500])
                     if st.button("删除", key=f"del_{note.id}"):
                         delete_note(note.id)

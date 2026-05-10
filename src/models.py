@@ -37,6 +37,7 @@ class Note(Base):
     content = Column(Text, default="")
     source_url = Column(String(500), default="")
     metrics_json = Column(Text, default="{}")
+    attachments_json = Column(Text, default="[]")
     published_at = Column(DateTime, nullable=True)
     imported_at = Column(DateTime, default=_now)
 
@@ -76,3 +77,19 @@ class GeneratedNote(Base):
     created_at = Column(DateTime, default=_now)
 
     skill = relationship("Skill", back_populates="generated_notes")
+
+
+class Material(Base):
+    __tablename__ = "materials"
+
+    id = Column(String(36), primary_key=True, default=_uuid)
+    blogger_id = Column(String(36), ForeignKey("bloggers.id"), nullable=False)
+    skill_id = Column(String(36), ForeignKey("skills.id"), nullable=True)
+    material_text = Column(Text, default="")
+    requirements_text = Column(Text, default="")
+    file_names_json = Column(Text, default="[]")
+    image_count = Column(Integer, default=0)
+    generated_note_id = Column(String(36), nullable=True)
+    created_at = Column(DateTime, default=_now)
+
+    blogger = relationship("Blogger")

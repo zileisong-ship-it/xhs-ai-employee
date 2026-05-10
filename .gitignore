@@ -11,3 +11,20 @@ build/
 Thumbs.db
 *.log
 .claude/
+
+# Project data (local)
+data/*.db
+data/media/
+data/skills/
+
+# Android build artifacts
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/*.apk
+android-app/local.properties
+
+# IDE
+.vscode/
+.idea/
+*.iml

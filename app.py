@@ -5,6 +5,7 @@ load_dotenv()
 
 import streamlit as st
 from src.database import init_db
+from pwa_inline import PWA_META
 from ui.home import show as show_home
 from ui.bloggers import show as show_bloggers
 from ui.import_notes import show as show_import
@@ -12,6 +13,7 @@ from ui.analysis_page import show as show_analysis
 from ui.skills import show as show_skills
 from ui.generate import show as show_generate
 from ui.history import show as show_history
+from ui.materials import show as show_materials
 
 
 def main():
@@ -21,6 +23,9 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded",
     )
+
+    # PWA 支持
+    st.markdown(PWA_META, unsafe_allow_html=True)
 
     # 初始化数据库
     init_db()
@@ -37,6 +42,7 @@ def main():
         "🧠 Skill 管理": show_skills,
         "✍️ 生成笔记": show_generate,
         "📊 历史反馈": show_history,
+        "📁 素材历史": show_materials,
     }
 
     page = st.sidebar.radio("选择页面", list(pages.keys()))
