@@ -24,9 +24,22 @@
 └─────────────┘ └─────────────┘
 ```
 
-三端共用同一台服务器 (Streamlit Cloud)，数据集中在云端。
+三端共用同一台服务器，数据集中在云端。
 
 ---
+
+## 部署方案选择
+
+| 方案 | 适合人群 | 费用 | 国内速度 | 数据持久化 |
+|------|----------|------|----------|------------|
+| **A: Streamlit Cloud** | 个人、测试、海外用户 | 免费 | 一般 | 容器重启会丢数据 |
+| **B: 阿里云 SAE + NAS** | 国内用户、生产环境 | ~¥30-60/月 | 快 | NAS 持久化，不丢数据 |
+
+下面分别介绍两种方案。
+
+---
+
+# 方案 A：Streamlit Cloud 部署（免费）
 
 ## 第一步：准备 GitHub 仓库
 
@@ -203,6 +216,217 @@ pythonw.exe E:\小红书AI员工\desktop_app.py
 
 ---
 
+# 方案 B：阿里云 SAE 部署（国内推荐）
+
+## 架构概览
+
+```
+┌──────────────────────────────────────────────┐
+│           阿里云 SAE (Serverless)             │
+│  ┌────────────────────────────────────────┐  │
+│  │  Docker Container (python:3.12-slim)   │  │
+│  │  ┌──────────────────────────────────┐  │  │
+│  │  │  app.py (Streamlit :8501)        │  │  │
+│  │  │  + UI + AI analysis/generation   │  │  │
+│  │  └──────────────────────────────────┘  │  │
+│  │  data/xhs_ai.db  ← NAS 挂载           │  │
+│  │  data/media/     ← NAS 挂载           │  │
+│  └──────────────┬───────────────────────┘  │
+│                 │                            │
+│  ┌──────────────┴───────────────────────┐  │
+│  │  阿里云 NAS (持久存储)                 │  │
+│  │  - 数据库文件永不丢失                  │  │
+│  │  - 媒体文件永不丢失                    │  │
+│  └──────────────────────────────────────┘  │
+└──────────────────────────────────────────────┘
+```
+
+## B.1 前置准备
+
+### 需要的阿里云服务
+
+| 服务 | 用途 | 费用 |
+|------|------|------|
+| **SAE** (Serverless App Engine) | 运行 Docker 容器 | 按量: ~¥0.003/核·秒 |
+| **ACR** (容器镜像服务) | 存储 Docker 镜像 | 个人版免费 |
+| **NAS** (文件存储) | 持久化数据库和媒体文件 | ~¥0.35/GB·月 (最低 ¥10/月) |
+
+> 个人使用预估：¥30-60/月（1核2G，10GB NAS）
+
+### 安装阿里云 CLI（可选，也可用网页控制台）
+
+```bash
+# Windows (PowerShell 管理员)
+winget install Alibaba.AlibabaCloudCLI
+
+# 配置凭证
+aliyun configure
+# 输入 AccessKey ID 和 AccessKey Secret
+```
+
+---
+
+## B.2 本地构建 Docker 镜像
+
+```bash
+cd E:\小红书AI员工
+
+# 构建镜像
+docker build -t xhs-ai-staff:latest .
+
+# 本地测试运行
+docker run -p 8501:8501 -e ANTHROPIC_API_KEY=sk-... xhs-ai-staff:latest
+
+# 浏览器打开 http://localhost:8501 验证
+```
+
+---
+
+## B.3 推送镜像到阿里云 ACR
+
+### 1. 创建容器镜像仓库
+
+访问 https://cr.console.aliyun.com：
+- 创建 **个人版** 实例
+- 命名空间: `xhs`
+- 仓库名称: `xhs-ai-staff`
+- 仓库类型: 私有
+
+### 2. 登录并推送
+
+```bash
+# 登录 ACR（替换为你的地域和命名空间）
+docker login --username=你的阿里云账号 registry.cn-hangzhou.aliyuncs.com
+
+# 打标签
+docker tag xhs-ai-staff:latest registry.cn-hangzhou.aliyuncs.com/xhs/xhs-ai-staff:latest
+
+# 推送
+docker push registry.cn-hangzhou.aliyuncs.com/xhs/xhs-ai-staff:latest
+```
+
+---
+
+## B.4 创建 NAS 文件系统
+
+访问 https://nas.console.aliyun.com：
+
+1. 创建文件系统：
+   - 类型: **通用型**
+   - 协议: **NFS**
+   - 地域: 与 SAE 相同（如杭州）
+   - 容量型即可
+
+2. 记录以下信息备用：
+   - 文件系统 ID (如 `123456-abc.cn-hangzhou.nas.aliyuncs.com`)
+   - 挂载点域名
+
+3. 创建挂载点目录（在 SAE 部署时自动创建）：
+   - `/app/data` — 数据库和媒体文件目录
+
+---
+
+## B.5 在 SAE 创建应用
+
+访问 https://sae.console.aliyun.com：
+
+### 1. 创建应用
+
+- **应用名称**: `xhs-ai-staff`
+- **运行时**: 容器镜像
+- **镜像地址**: `registry.cn-hangzhou.aliyuncs.com/xhs/xhs-ai-staff:latest`
+- **命名空间**: 默认或新建
+- **VPC/交换机**: 选择或新建（SAE 会自动配置）
+
+### 2. 资源配置
+
+```
+CPU: 1 核
+内存: 2 GB
+实例数: 1（个人使用即可）
+```
+
+### 3. 配置环境变量
+
+在应用设置中添加：
+
+| 变量名 | 值 | 说明 |
+|--------|-----|------|
+| `ANTHROPIC_API_KEY` | `sk-你的key` | Claude API 密钥 |
+
+### 4. 配置 NAS 挂载
+
+在 **存储** 或 **持久化存储** 设置中：
+
+- 挂载点: `/app/data`
+- NAS 文件系统: 选择 B.4 创建的
+- 容量: 10 GB
+
+### 5. 配置 SLB（公网访问）
+
+- 在 **网络设置** 中启用公网访问
+- SAE 自动分配一个公网域名（如 `xhs-ai-staff.cn-hangzhou.sae.aliyuncs.com`）
+
+### 6. 部署
+
+点击 **确认创建**，SAE 自动拉取镜像启动容器。
+
+---
+
+## B.6 配置自定义域名（可选）
+
+1. 在阿里云 **DNS** 或你的域名服务商添加 CNAME 记录
+2. 指向 SAE 分配的公网域名
+3. 在 SAE → 应用 → 域名管理 中添加自定义域名
+4. 上传 SSL 证书启用 HTTPS
+
+---
+
+## B.7 更新应用
+
+每次代码更新后：
+
+```bash
+# 1. 重新构建
+docker build -t xhs-ai-staff:latest .
+
+# 2. 推送到 ACR
+docker tag xhs-ai-staff:latest registry.cn-hangzhou.aliyuncs.com/xhs/xhs-ai-staff:latest
+docker push registry.cn-hangzhou.aliyuncs.com/xhs/xhs-ai-staff:latest
+
+# 3. 在 SAE 控制台 → 应用 → 变更镜像 → 部署
+# 或使用 CLI:
+aliyun sae DeployApplication \
+  --AppId <app-id> \
+  --ImageUrl registry.cn-hangzhou.aliyuncs.com/xhs/xhs-ai-staff:latest
+```
+
+---
+
+## B.8 方案 B 环境变量参考
+
+Docker 容器支持的环境变量汇总：
+
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `ANTHROPIC_API_KEY` | 是 | — | Claude API 密钥 |
+| `DATABASE_URL` | 否 | — | PostgreSQL 连接串（可选，用于替代 SQLite） |
+| `MEDIA_DIR` | 否 | `data/media` | 媒体文件目录 |
+
+## B.9 方案 B 成本估算
+
+| 资源 | 规格 | 月费（约） |
+|------|------|------------|
+| SAE 计算 | 1核2G × 1实例 | ¥25-40 |
+| NAS 存储 | 10 GB | ¥3-5 |
+| ACR 镜像 | 个人版 | 免费 |
+| SLB 公网 | 共享 | ¥10-15 |
+| **合计** | | **¥38-60/月** |
+
+> 如用 SAE 按量计费（无访问时缩容到 0），费用可降低 50% 以上。
+
+---
+
 ## 常见问题
 
 ### Q: Streamlit Cloud 免费版有什么限制？
@@ -232,6 +456,22 @@ pythonw.exe E:\小红书AI员工\desktop_app.py
 - 重新构建 APK 并安装即可覆盖旧版本
 - 或者 APP 内部通过 WebView 自动加载最新的云端代码，无需更新 APP
 
+### Q: SAE 和 Streamlit Cloud 怎么选？
+- **只在国内用、想要可靠服务** → 阿里云 SAE
+- **只是自己玩玩、能接受偶尔无法访问** → Streamlit Cloud 免费版
+- 两套可以同时部署，共用同一套代码
+
+### Q: SAE 的 NAS 数据会丢吗？
+- NAS 是独立的持久化存储服务，不是容器本地磁盘
+- 容器重启、重新部署都不会影响 NAS 数据
+- NAS 本身有 99.9999999% 的数据可靠性保障
+
+### Q: 如何从 Streamlit Cloud 迁移到 SAE？
+1. 下载 Streamlit Cloud 上的 `data/xhs_ai.db` 和 `data/media/`
+2. 上传到 SAE 的 NAS 挂载目录
+3. 更新 Android 和桌面版的 URL 指向 SAE 地址
+4. 完成迁移
+
 ---
 
 ## 技术架构说明
@@ -240,17 +480,21 @@ pythonw.exe E:\小红书AI员工\desktop_app.py
 项目文件结构:
 ├── app.py                    # Streamlit 应用入口
 ├── config.yaml               # 本地配置
+├── Dockerfile                # Docker 容器化
+├── .dockerignore             # Docker 构建排除
+├── docker-compose.yml        # 本地 Docker 测试
 ├── .streamlit/
 │   └── config.toml           # Streamlit Cloud 主题/服务器配置
-├── packages.txt              # 系统依赖 (OpenCV)
+├── packages.txt              # 系统依赖 (OpenCV, Streamlit Cloud用)
 ├── requirements.txt          # Python 依赖
 ├── src/
-│   ├── config.py             # 配置 + Anthropic 客户端
-│   ├── database.py           # SQLAlchemy 数据库
-│   ├── models.py             # 数据模型定义
+│   ├── config.py             # 配置 + Anthropic 客户端 + 环境变量
+│   ├── database.py           # SQLAlchemy 数据库 (SQLite/PostgreSQL)
+│   ├── models.py             # 数据模型定义 (5 tables)
+│   ├── storage.py            # (预留) 云存储抽象
 │   ├── analysis/             # AI 分析引擎
 │   ├── generation/           # 笔记生成引擎
-│   ├── ingestion/            # 笔记导入 + MCP 抽象
+│   ├── ingestion/            # 笔记导入 + 媒体存储 + MCP 抽象
 │   ├── skills/               # Skill 管理
 │   └── feedback/             # 反馈循环
 ├── ui/                       # Streamlit 页面组件

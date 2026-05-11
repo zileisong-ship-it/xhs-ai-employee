@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Project data (fresh volume each deploy)
+data/*.db
+data/media/*
+data/skills/*
+
+# Documentation
+*.md
+!requirements.txt
+
+# Desktop stuff (not needed in Docker)
+desktop_app.py
+app_icon.ico
+
+# Android (not needed in Docker)
+android-app/
+
+# Claude internal
+.claude/
+
+# Temp
+*.log
+Thumbs.db
+.DS_Store

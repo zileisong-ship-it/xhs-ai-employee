@@ -8,24 +8,28 @@ import uuid
 from pathlib import Path
 from typing import Protocol
 
+from src.config import get_env_config
 from src.generation.file_parser import parse_uploaded_file
 
 # ============================================================
 # Media storage
 # ============================================================
 
-MEDIA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "media")
+
+def _get_media_dir() -> str:
+    return get_env_config()["MEDIA_DIR"]
 
 
 def save_media_files(files: list[tuple[bytes, str]]) -> list[dict]:
     """Save uploaded media files to disk. Returns list of attachment metadata dicts."""
-    os.makedirs(MEDIA_DIR, exist_ok=True)
+    media_dir = _get_media_dir()
+    os.makedirs(media_dir, exist_ok=True)
     attachments = []
     for file_bytes, filename in files:
         file_id = str(uuid.uuid4())[:8]
         ext = Path(filename).suffix
         saved_name = f"{file_id}{ext}"
-        saved_path = os.path.join(MEDIA_DIR, saved_name)
+        saved_path = os.path.join(media_dir, saved_name)
         with open(saved_path, "wb") as f:
             f.write(file_bytes)
         attachments.append({

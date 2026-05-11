@@ -63,6 +63,20 @@ def call_with_retry(client: Anthropic, config_section: str, **kwargs) -> str:
     raise last_error
 
 
+def get_env_config() -> dict:
+    """返回环境变量驱动的部署配置，优先使用环境变量，否则使用默认值。
+
+    支持的环境变量:
+      DATABASE_URL  — PostgreSQL 连接串（设置后优先于 SQLite）
+      MEDIA_DIR     — 媒体文件存储目录（默认: data/media）
+    """
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    return {
+        "DATABASE_URL": os.environ.get("DATABASE_URL", ""),
+        "MEDIA_DIR": os.environ.get("MEDIA_DIR", os.path.join(project_root, "data", "media")),
+    }
+
+
 def call_and_parse_json(client: Anthropic, config_section: str, **kwargs) -> dict:
     """Call Claude API with retry and parse response as JSON."""
     import json
