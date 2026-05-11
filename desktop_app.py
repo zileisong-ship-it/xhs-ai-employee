@@ -48,6 +48,7 @@ def main():
         env = os.environ.copy()
         env["PYTHONUTF8"] = "1"
         env["PYTHONIOENCODING"] = "utf-8"
+        env["XHS_DESKTOP_MODE"] = "1"  # 告诉 app.py 跳过 PWA 注入
         streamlit_proc = subprocess.Popen(
             [
                 sys.executable, "-X", "utf8", "-m", "streamlit", "run", "app.py",

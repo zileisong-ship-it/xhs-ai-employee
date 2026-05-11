@@ -24,8 +24,10 @@ def main():
         initial_sidebar_state="expanded",
     )
 
-    # PWA 支持
-    st.markdown(PWA_META, unsafe_allow_html=True)
+    # PWA 支持（桌面模式下跳过，避免 pywebview 渲染乱码）
+    import os as _os
+    if not _os.environ.get("XHS_DESKTOP_MODE"):
+        st.markdown(PWA_META, unsafe_allow_html=True)
 
     # 初始化数据库
     init_db()
