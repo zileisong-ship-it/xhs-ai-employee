@@ -70,22 +70,59 @@ def main():
 
     # 打开原生桌面窗口（Edge Chromium 内核）
     import webview
-    # 确保使用 Edge Chromium 内核，避免 IE 内核中文乱码
+
+    # 检查 WebView2 是否可用
+    webview_ok = False
     try:
         from webview import config as wv_config
         wv_config.gui = 'edgechromium'
+        wv_config.gui  # 确认设置生效
+        webview_ok = True
     except Exception:
         pass
 
-    webview.create_window(
-        title="小红书AI写作助手",
-        url=url,
-        width=1280,
-        height=860,
-        min_size=(900, 600),
-        text_select=True,
-    )
-    webview.start()
+    if webview_ok:
+        try:
+            webview.create_window(
+                title="小红书AI写作助手",
+                url=url,
+                width=1280,
+                height=860,
+                min_size=(900, 600),
+                text_select=True,
+            )
+            webview.start()
+        except Exception as e:
+            print(f"pywebview 启动失败: {e}")
+            webview_ok = False
+
+    # 如果 pywebview 不可用，回退到系统浏览器 app 模式
+    if not webview_ok:
+        import webbrowser
+        print("使用系统浏览器打开...")
+        # 尝试用 Chrome/Edge app 模式（无浏览器边框的窗口）
+        chrome_paths = [
+            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+            "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+            "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+            "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+        ]
+        browser_launched = False
+        for browser in chrome_paths:
+            if os.path.exists(browser):
+                subprocess.Popen([browser, f"--app={url}", "--window-size=1280,860"])
+                browser_launched = True
+                break
+
+        if not browser_launched:
+            webbrowser.open(url)
+
+        # 等待 Streamlit 进程（用户关闭浏览器窗口后手动 Ctrl+C 退出）
+        try:
+            while streamlit_proc and streamlit_proc.poll() is None:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
 
     # 窗口关闭后清理
     if streamlit_proc:
